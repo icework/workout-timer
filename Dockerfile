@@ -1,16 +1,18 @@
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production
+# Install ALL dependencies (including dev) for build
+RUN npm install
 
-# Copy build output
-COPY dist/ ./dist/
-COPY server.js ./
+# Copy source code
+COPY . .
+
+# Build the app
+RUN npm run build
 
 # Expose port
 EXPOSE 3000
