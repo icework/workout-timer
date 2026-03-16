@@ -1,0 +1,5 @@
+[phases.setup]
+nixpacksVersion = "latest"
+
+[nodejs]
+version = "22"
