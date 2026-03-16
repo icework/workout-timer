@@ -2,20 +2,14 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copy only what's needed for running
+COPY dist/ ./dist/
+COPY server.js ./
 COPY package*.json ./
 
-# Install ALL dependencies (including dev) for build
-RUN npm install
+# Install production dependencies only
+RUN npm ci --only=production
 
-# Copy source code
-COPY . .
-
-# Build the app
-RUN npm run build
-
-# Expose port
 EXPOSE 3000
 
-# Start server
 CMD ["node", "server.js"]
