@@ -1,0 +1,72 @@
+<h2>Proposed Architecture Overview</h2>
+<p class="subtitle">React + TypeScript + Vite + Tailwind + Zustand + Dexie</p>
+
+<div class="section">
+  <h3>System Layers</h3>
+  <div class="mockup">
+    <div class="mockup-header">Architecture Diagram</div>
+    <div class="mockup-body" style="font-family: monospace; font-size: 14px; line-height: 1.6; padding: 20px;">
+<pre style="margin: 0;">
+┌─────────────────────────────────────────────────────────────────┐
+│                        UI Layer (React)                         │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐│
+│  │  Workout │ │  Builder │ │  Timer   │ │  Stats   │ │ Common ││
+│  │  Library │ │  Screen  │ │  Runner  │ │Dashboard │ │  UI    ││
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └────────┘│
+└───────┼────────────┼────────────┼────────────┼──────────────────┘
+        │            │            │            │
+┌───────▼────────────▼────────────▼────────────▼──────────────────┐
+│                     State Layer (Zustand)                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
+│  │ workoutStore │  │  timerStore  │  │ sessionStore │           │
+│  │  - workouts  │  │  - phase     │  │  - sessions  │           │
+│  │  - current   │  │  - remaining │  │  - stats     │           │
+│  │  - CRUD ops  │  │  - controls  │  │  - history   │           │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
+└─────────┼─────────────────┼─────────────────┼───────────────────┘
+          │                 │                 │
+┌─────────▼─────────────────▼─────────────────▼───────────────────┐
+│                   Domain Layer (Pure TS)                         │
+│  ┌────────────────┐  ┌────────────────┐  ┌────────────────┐     │
+│  │ Workout Logic  │  │  Timer Engine  │  │ Stats Calculator│     │
+│  │ - sequencing   │  │  - countdown   │  │ - aggregations │     │
+│  │ - validation   │  │  - transitions │  │ - completion % │     │
+│  │ - duration calc│  │  - phase mgmt  │  │ - most used    │     │
+│  └────────────────┘  └────────────────┘  └────────────────┘     │
+└─────────────────────────────────────────────────────────────────┘
+          │                                   │
+┌─────────▼───────────────────────────────────▼───────────────────┐
+│                 Persistence Layer (Dexie.js)                     │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                      IndexedDB                           │    │
+│  │   workouts    │   exerciseBlocks   │   sessions   │ profile │
+│  └─────────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Design Decisions</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div style="background: #1a1a2e; padding: 16px; border-radius: 8px;">
+      <h4 style="color: #4ade80; margin-top: 0;">Domain Layer Isolation</h4>
+      <p style="color: #a0a0a0; margin-bottom: 0;">Pure TypeScript with no React/storage dependencies. Enables future native apps and backend migration.</p>
+    </div>
+    <div style="background: #1a1a2e; padding: 16px; border-radius: 8px;">
+      <h4 style="color: #4ade80; margin-top: 0;">Timer Engine Separation</h4>
+      <p style="color: #a0a0a0; margin-bottom: 0;">Core timer logic independent of UI. Handles phase transitions, pause/resume, and drift correction.</p>
+    </div>
+    <div style="background: #1a1a2e; padding: 16px; border-radius: 8px;">
+      <h4 style="color: #4ade80; margin-top: 0;">Store-per-Concern</h4>
+      <p style="color: #a0a0a0; margin-bottom: 0;">Separate Zustand stores for workouts, timer state, and sessions. Clean boundaries, easy testing.</p>
+    </div>
+    <div style="background: #1a1a2e; padding: 16px; border-radius: 8px;">
+      <h4 style="color: #4ade80; margin-top: 0;">Persistence Abstraction</h4>
+      <p style="color: #a0a0a0; margin-bottom: 0;">Dexie wrapper allows swapping to API calls later without changing store logic.</p>
+    </div>
+  </div>
+</div>
+
+<p style="text-align: center; color: #888; margin-top: 24px;">Does this architecture look right? Let me know in the terminal.</p>
