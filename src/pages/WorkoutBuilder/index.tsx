@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWorkoutStore } from '../../stores/workoutStore';
-import { BlockCard, DurationInput } from '../../components';
+import { BlockCard, DurationInput, NumericInput } from '../../components';
 import type { ExerciseBlock } from '../../domain/workout';
 
 interface BlockFormData {
@@ -119,15 +119,13 @@ function BlockForm({
             >
               −
             </button>
-            <input
+            <NumericInput
               id="repeat-count"
-              type="number"
               value={form.repeatCount}
-              onChange={(e) =>
-                setForm({ ...form, repeatCount: Math.max(1, parseInt(e.target.value, 10) || 1) })
-              }
+              onChange={(value: number) => setForm({ ...form, repeatCount: value })}
               min={1}
               max={100}
+              fallbackValue={1}
               className="w-16 h-11 text-center text-lg font-mono bg-white border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
             <button

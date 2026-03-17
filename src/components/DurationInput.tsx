@@ -1,3 +1,5 @@
+import { NumericInput } from './NumericInput';
+
 interface DurationInputProps {
   value: number; // seconds
   onChange: (value: number) => void;
@@ -32,16 +34,12 @@ export function DurationInput({
     onChange(newValue);
   };
 
-  const handleMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newMinutes = parseInt(e.target.value, 10) || 0;
+  const handleMinutesChange = (newMinutes: number) => {
     const newValue = Math.min(Math.max(newMinutes * 60 + seconds, min), max);
     onChange(newValue);
   };
 
-  const handleSecondsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let newSeconds = parseInt(e.target.value, 10) || 0;
-    // Clamp seconds to 0-59
-    newSeconds = Math.min(Math.max(newSeconds, 0), 59);
+  const handleSecondsChange = (newSeconds: number) => {
     const newValue = Math.min(Math.max(minutes * 60 + newSeconds, min), max);
     onChange(newValue);
   };
@@ -63,22 +61,22 @@ export function DurationInput({
         </button>
 
         <div className="flex items-center gap-1 bg-white border border-gray-300 rounded-lg px-3 py-2">
-          <input
-            type="number"
+          <NumericInput
             value={minutes}
             onChange={handleMinutesChange}
             min={0}
             max={Math.floor(max / 60)}
+            fallbackValue={0}
             className="w-10 text-center text-lg font-mono bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             aria-label="Minutes"
           />
           <span className="text-lg font-mono text-gray-500">:</span>
-          <input
-            type="number"
+          <NumericInput
             value={seconds.toString().padStart(2, '0')}
             onChange={handleSecondsChange}
             min={0}
             max={59}
+            fallbackValue={0}
             className="w-10 text-center text-lg font-mono bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             aria-label="Seconds"
           />

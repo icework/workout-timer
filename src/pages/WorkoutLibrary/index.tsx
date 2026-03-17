@@ -6,20 +6,33 @@ import type { Workout } from '../../domain/workout';
 
 interface WorkoutCardProps {
   workout: Workout;
+  onOpen: () => void;
   onStart: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
 }
 
-function WorkoutCard({ workout, onStart, onEdit, onDelete, onDuplicate }: WorkoutCardProps) {
+export function WorkoutCard({
+  workout,
+  onOpen,
+  onStart,
+  onEdit,
+  onDelete,
+  onDuplicate,
+}: WorkoutCardProps) {
   const [showActions, setShowActions] = useState(false);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
+      <div className="p-4 flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex-1 min-w-0 text-left rounded-lg hover:bg-gray-50 active:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          aria-label={`Open ${workout.title} details`}
+        >
+          <div className="pr-2">
             <h3 className="font-semibold text-gray-900 truncate">{workout.title}</h3>
             <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
               <span>{formatDuration(workout.estimatedDurationSec)}</span>
@@ -33,19 +46,19 @@ function WorkoutCard({ workout, onStart, onEdit, onDelete, onDuplicate }: Workou
               {workout.blocks.length} {workout.blocks.length === 1 ? 'block' : 'blocks'}
             </p>
           </div>
+        </button>
 
-          <button
-            type="button"
-            onClick={() => setShowActions(!showActions)}
-            className="w-11 h-11 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 active:bg-gray-200"
-            aria-label="More actions"
-            aria-expanded={showActions}
-          >
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
-            </svg>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setShowActions(!showActions)}
+          className="w-11 h-11 flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 active:bg-gray-200"
+          aria-label="More actions"
+          aria-expanded={showActions}
+        >
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+          </svg>
+        </button>
       </div>
 
       {/* Action buttons row */}
@@ -127,19 +140,9 @@ function WorkoutCard({ workout, onStart, onEdit, onDelete, onDuplicate }: Workou
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+export function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center mb-4">
-        <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          />
-        </svg>
-      </div>
       <h2 className="text-lg font-semibold text-gray-900 mb-2">No workouts yet</h2>
       <p className="text-gray-500 mb-6 max-w-xs">
         Create your first workout to start timing your exercises.
@@ -201,6 +204,10 @@ export function WorkoutLibrary() {
 
   const handleStart = (workoutId: string) => {
     navigate(`/workout/${workoutId}/run`);
+  };
+
+  const handleOpen = (workoutId: string) => {
+    navigate(`/workout/${workoutId}`);
   };
 
   const handleEdit = (workoutId: string) => {
@@ -271,6 +278,7 @@ export function WorkoutLibrary() {
               <WorkoutCard
                 key={workout.id}
                 workout={workout}
+                onOpen={() => handleOpen(workout.id)}
                 onStart={() => handleStart(workout.id)}
                 onEdit={() => handleEdit(workout.id)}
                 onDelete={() => handleDelete(workout.id)}
