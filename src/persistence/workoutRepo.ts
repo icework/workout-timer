@@ -1,5 +1,8 @@
-import { db } from './db';
 import type { Workout } from '../domain/workout';
+import type { WorkoutsResponse } from '../backend/contracts';
+import { useAuthStore } from '../stores/authStore';
+import { requestJson } from './httpClient';
+import { deserializeWorkout, serializeWorkout } from './serializers';
 
 // ============================================================================
 // Workout Repository
@@ -7,23 +10,18 @@ import type { Workout } from '../domain/workout';
 
 /**
  * Repository for workout and block persistence operations.
- * Uses Dexie.js for IndexedDB access.
+ * Uses the backend JSON API for persistence.
  */
 export const workoutRepo = {
   /**
-   * Gets all non-deleted workouts with their blocks attached.
+   * Gets all workouts for the authenticated user.
    */
   async getAll(): Promise<Workout[]> {
-    // Filter non-deleted workouts (isDeleted is boolean false)
-    const allWorkouts = await db.workouts.toArray();
-    const workouts = allWorkouts.filter((w) => !w.isDeleted);
-
-    // Attach blocks to each workout
-    for (const w of workouts) {
-      w.blocks = await db.blocks.where('workoutId').equals(w.id).sortBy('order');
-    }
-
-    return workouts;
+    const username = requireUsername();
+    const response = await requestJson<WorkoutsResponse<ReturnType<typeof serializeWorkout>>>(
+      `/api/users/${encodeURIComponent(username)}/workouts`
+    );
+    return response.workouts.map(deserializeWorkout);
   },
 
   /**
@@ -31,46 +29,25 @@ export const workoutRepo = {
    * Returns undefined if not found or if soft-deleted.
    */
   async getById(id: string): Promise<Workout | undefined> {
-    const workout = await db.workouts.get(id);
-
-    if (!workout || workout.isDeleted) {
-      return undefined;
-    }
-
-    // Attach blocks
-    workout.blocks = await db.blocks.where('workoutId').equals(id).sortBy('order');
-
-    return workout;
+    const workouts = await this.getAll();
+    return workouts.find((workout) => workout.id === id);
   },
 
   /**
-   * Saves a workout and its blocks.
-   * Uses a transaction to ensure atomicity.
-   * Cleans up orphan blocks that were removed from the workout.
+   * Saves a workout.
    */
   async save(workout: Workout): Promise<void> {
-    await db.transaction('rw', [db.workouts, db.blocks], async () => {
-      // Save workout (without blocks array for storage)
-      const { blocks, ...workoutData } = workout;
-      await db.workouts.put(workoutData as Workout);
-
-      // Delete blocks no longer in the workout
-      const existingBlocks = await db.blocks
-        .where('workoutId')
-        .equals(workout.id)
-        .toArray();
-      const newBlockIds = new Set(blocks.map((b) => b.id));
-      for (const existing of existingBlocks) {
-        if (!newBlockIds.has(existing.id)) {
-          await db.blocks.delete(existing.id);
-        }
+    const username = requireUsername();
+    await requestJson<{ ok: boolean }>(
+      `/api/users/${encodeURIComponent(username)}/workouts/${encodeURIComponent(workout.id)}`,
+      {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(serializeWorkout(workout)),
       }
-
-      // Upsert current blocks
-      for (const block of blocks) {
-        await db.blocks.put(block);
-      }
-    });
+    );
   },
 
   /**
@@ -78,13 +55,29 @@ export const workoutRepo = {
    * Preserves workout for session history.
    */
   async softDelete(id: string): Promise<void> {
-    await db.workouts.update(id, { isDeleted: true, updatedAt: new Date() });
+    const username = requireUsername();
+    await requestJson<{ ok: boolean }>(
+      `/api/users/${encodeURIComponent(username)}/workouts/${encodeURIComponent(id)}`,
+      {
+        method: 'DELETE',
+      }
+    );
   },
 
   /**
-   * Deletes a block from the database.
+   * Legacy method retained for compatibility with existing store code.
    */
-  async deleteBlock(blockId: string): Promise<void> {
-    await db.blocks.delete(blockId);
+  async deleteBlock(_blockId: string): Promise<void> {
+    return Promise.resolve();
   },
 };
+
+function requireUsername(): string {
+  const username = useAuthStore.getState().username;
+
+  if (!username) {
+    throw new Error('You must be logged in to access workouts');
+  }
+
+  return username;
+}
