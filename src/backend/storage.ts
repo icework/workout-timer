@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import type { Workout } from '../domain/workout.ts';
@@ -20,11 +21,14 @@ export interface StorageFile {
 }
 
 export class StorageError extends Error {
+  readonly code: 'INVALID_STORAGE' | 'NOT_FOUND' | 'IMPORT_CONFLICT';
+
   constructor(
     message: string,
-    readonly code: 'INVALID_STORAGE' | 'NOT_FOUND' | 'IMPORT_CONFLICT'
+    code: 'INVALID_STORAGE' | 'NOT_FOUND' | 'IMPORT_CONFLICT'
   ) {
     super(message);
+    this.code = code;
   }
 }
 
@@ -60,7 +64,7 @@ export function createJsonStorage(filePath: string) {
   }
 
   async function writeStorage(data: StorageFile): Promise<void> {
-    const tempPath = `${filePath}.tmp`;
+    const tempPath = `${filePath}.${randomUUID()}.tmp`;
     const payload = `${JSON.stringify(data, null, 2)}\n`;
     await writeFile(tempPath, payload, 'utf8');
     await rename(tempPath, filePath);

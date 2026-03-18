@@ -61,6 +61,14 @@ describe('createJsonStorage', () => {
     ]);
   });
 
+  it('bootstraps storage safely during concurrent first access', async () => {
+    const storage = await createStorage();
+
+    await expect(
+      Promise.all([storage.read(), storage.ensureUser('alice')])
+    ).resolves.toBeDefined();
+  });
+
   it('returns only non-deleted workouts for a user', async () => {
     const storage = await createStorage();
 
