@@ -1,7 +1,7 @@
 import { access, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import type { Workout } from '../domain/workout';
-import { normalizeUsername } from '../auth/username';
+import type { Workout } from '../domain/workout.ts';
+import { normalizeUsername } from '../auth/username.ts';
 
 export interface StoredSession {
   id: string;
@@ -17,6 +17,15 @@ export interface UserBucket {
 
 export interface StorageFile {
   users: Record<string, UserBucket>;
+}
+
+export class StorageError extends Error {
+  constructor(
+    message: string,
+    readonly code: 'INVALID_STORAGE' | 'NOT_FOUND' | 'IMPORT_CONFLICT'
+  ) {
+    super(message);
+  }
 }
 
 const EMPTY_STORAGE: StorageFile = {
@@ -43,7 +52,11 @@ export function createJsonStorage(filePath: string) {
       return structuredClone(EMPTY_STORAGE);
     }
 
-    return JSON.parse(content) as StorageFile;
+    try {
+      return JSON.parse(content) as StorageFile;
+    } catch {
+      throw new StorageError('Storage JSON is malformed', 'INVALID_STORAGE');
+    }
   }
 
   async function writeStorage(data: StorageFile): Promise<void> {
@@ -71,6 +84,17 @@ export function createJsonStorage(filePath: string) {
       };
     }
     return data.users[normalized];
+  }
+
+  function getExistingUser(data: StorageFile, username: string): UserBucket {
+    const normalized = normalizeUsername(username);
+    const user = data.users[normalized];
+
+    if (!user) {
+      throw new StorageError(`Unknown user: ${normalized}`, 'NOT_FOUND');
+    }
+
+    return user;
   }
 
   return {
@@ -104,8 +128,64 @@ export function createJsonStorage(filePath: string) {
 
     async getWorkouts(username: string): Promise<StoredWorkout[]> {
       const data = await readStorage();
-      const user = getOrCreateUser(data, username);
-      return user.workouts;
+      const user = getExistingUser(data, username);
+      return user.workouts.filter((workout) => !workout.isDeleted);
+    },
+
+    async softDeleteWorkout(username: string, workoutId: string): Promise<void> {
+      await queueWrite(async () => {
+        const data = await readStorage();
+        const user = getExistingUser(data, username);
+        const workout = user.workouts.find((item) => item.id === workoutId);
+
+        if (!workout) {
+          throw new StorageError(`Unknown workout: ${workoutId}`, 'NOT_FOUND');
+        }
+
+        workout.isDeleted = true;
+        workout.updatedAt = new Date() as Workout['updatedAt'];
+        await writeStorage(data);
+      });
+    },
+
+    async upsertSession(username: string, session: StoredSession): Promise<void> {
+      await queueWrite(async () => {
+        const data = await readStorage();
+        const user = getOrCreateUser(data, username);
+        const index = user.sessions.findIndex((item) => item.id === session.id);
+
+        if (index >= 0) {
+          user.sessions[index] = session;
+        } else {
+          user.sessions.push(session);
+        }
+
+        await writeStorage(data);
+      });
+    },
+
+    async getSessions(username: string): Promise<StoredSession[]> {
+      const data = await readStorage();
+      const user = getExistingUser(data, username);
+      return user.sessions;
+    },
+
+    async importUserData(
+      username: string,
+      payload: { workouts: StoredWorkout[]; sessions: StoredSession[] }
+    ): Promise<void> {
+      await queueWrite(async () => {
+        const data = await readStorage();
+        const user = getOrCreateUser(data, username);
+
+        if (user.workouts.length > 0 || user.sessions.length > 0) {
+          throw new StorageError('IMPORT_CONFLICT', 'IMPORT_CONFLICT');
+        }
+
+        user.workouts = payload.workouts;
+        user.sessions = payload.sessions;
+        await writeStorage(data);
+      });
     },
   };
 }

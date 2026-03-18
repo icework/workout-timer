@@ -60,4 +60,31 @@ describe('createJsonStorage', () => {
       expect.objectContaining({ id: 'b' }),
     ]);
   });
+
+  it('returns only non-deleted workouts for a user', async () => {
+    const storage = await createStorage();
+
+    await storage.upsertWorkout('alice', {
+      ...createWorkout('a'),
+      isDeleted: true,
+    });
+
+    await expect(storage.getWorkouts('alice')).resolves.toEqual([]);
+  });
+
+  it('rejects import when the target bucket already has session data', async () => {
+    const storage = await createStorage();
+
+    await storage.upsertSession('alice', {
+      id: 'session-1',
+      workoutId: 'workout-1',
+    });
+
+    await expect(
+      storage.importUserData('alice', {
+        workouts: [createWorkout('a')],
+        sessions: [],
+      })
+    ).rejects.toThrow('IMPORT_CONFLICT');
+  });
 });
