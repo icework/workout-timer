@@ -7,6 +7,11 @@ interface AudioWindow extends Window {
   webkitAudioContext?: AudioContextConstructor;
 }
 
+// navigator.audioSession is an iOS 17+ / experimental API not yet in TS lib types.
+interface NavigatorWithAudioSession extends Navigator {
+  audioSession?: { type: string };
+}
+
 const BEEP_DURATION_SEC = 0.12;
 const BEEP_GAP_SEC = 0.16;
 const BEEP_FREQUENCY_HZ = 880;
@@ -92,6 +97,16 @@ export function primeCountdownAudio(): void {
 
   if (context.state === 'running') {
     return;
+  }
+
+  // iOS routes Web Audio through the "ambient" channel by default, which is
+  // silenced by the ringer switch and can be muted by the OS even when the
+  // switch is off. Setting type = "playback" switches to the media channel
+  // (same as <audio>/<video>), which is always audible when the device is
+  // not in silent mode. Requires iOS 17+ / Safari 17+; ignored elsewhere.
+  const nav = navigator as NavigatorWithAudioSession;
+  if (nav.audioSession) {
+    nav.audioSession.type = 'playback';
   }
 
   playSilentBuffer(context);
