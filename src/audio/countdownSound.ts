@@ -64,10 +64,13 @@ function playSilentBuffer(context: AudioContext): void {
 /**
  * Synchronous unlock — must be called directly from a user gesture handler.
  *
- * On iOS Chrome (WKWebView), WebKit's user-gesture indicator does not propagate
- * through async wrappers, so resume() must be initiated in the synchronous call
- * stack of a touch/click event. Additionally, iOS requires actual audio playback
- * (even a silent buffer) to activate AVAudioSession; resume() alone is not enough.
+ * On iOS Chrome (WKWebView), both the silent-buffer playback and resume() must
+ * happen in the synchronous call stack of the click/touch event. Using .then()
+ * defers work to a microtask that is outside the gesture window on older iOS.
+ *
+ * Correct order (matches Howler.js / Tone.js):
+ *   1. playSilentBuffer() — schedules audio, signals "audio intent" to iOS
+ *   2. resume()           — transitions the context from suspended → running
  */
 export function primeCountdownAudio(): void {
   if (typeof window === 'undefined') {
@@ -91,13 +94,8 @@ export function primeCountdownAudio(): void {
     return;
   }
 
-  // resume() is called synchronously here (within the user gesture call stack).
-  // Once it resolves, play a silent buffer to activate iOS AVAudioSession.
-  void context.resume().then(() => {
-    if (context.state === 'running') {
-      playSilentBuffer(context);
-    }
-  });
+  playSilentBuffer(context);
+  void context.resume();
 }
 
 export async function unlockCountdownAudio(): Promise<boolean> {

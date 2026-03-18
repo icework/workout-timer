@@ -90,27 +90,27 @@ describe('countdown sound player', () => {
     expect(MockAudioContext.instances[0].oscillator.start).toHaveBeenCalledWith(12);
   });
 
-  it('primeCountdownAudio creates and resumes the context synchronously for iOS Chrome', async () => {
+  it('primeCountdownAudio plays silent buffer synchronously before resume for iOS', async () => {
     vi.stubGlobal('window', {
       AudioContext: MockAudioContext,
     });
 
     MockAudioContext.allowResume = true;
-    primeCountdownAudio(); // synchronous call — no await
+    primeCountdownAudio(); // synchronous — silent buffer and resume() both happen here
 
-    // Flush microtask queue so the mock's async resume() and the .then() can settle
-    await Promise.resolve();
+    // Silent buffer must have been played synchronously (before any await)
+    expect(MockAudioContext.instances).toHaveLength(1);
+    expect(MockAudioContext.instances[0].createBufferSource).toHaveBeenCalledTimes(1);
+    expect(MockAudioContext.instances[0].bufferSource.start).toHaveBeenCalledTimes(1);
+    expect(MockAudioContext.instances[0].resume).toHaveBeenCalledTimes(1);
+
+    // Flush microtask queue so the mock's async resume() can settle
     await Promise.resolve();
 
     MockAudioContext.allowResume = false;
     const player = createCountdownSoundPlayer();
     await player.playBeeps([3]);
 
-    expect(MockAudioContext.instances).toHaveLength(1);
-    expect(MockAudioContext.instances[0].resume).toHaveBeenCalledTimes(1);
-    // Silent buffer should have been played to activate iOS AVAudioSession
-    expect(MockAudioContext.instances[0].createBufferSource).toHaveBeenCalledTimes(1);
-    expect(MockAudioContext.instances[0].bufferSource.start).toHaveBeenCalledTimes(1);
     expect(MockAudioContext.instances[0].createOscillator).toHaveBeenCalledTimes(1);
   });
 });
