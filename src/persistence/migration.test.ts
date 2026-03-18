@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../domain/workout';
 import type { WorkoutSession } from '../domain/session';
 import { MigrationError, migrateLegacyData } from './migration';
+import { createMigrationBlockedHandlers, MIGRATION_BOOT_MESSAGE } from '../App';
 
 function createWorkout(): Workout {
   return {
@@ -111,5 +112,91 @@ describe('migrateLegacyData', () => {
       claimedUsername: 'alice',
       status: 'conflict',
     });
+  });
+
+  it('requires ownership confirmation again after clearing the migration claim', async () => {
+    const { deps, state } = createDeps();
+    const confirmOwnership = vi.fn(async () => true);
+    let importAttempts = 0;
+
+    deps.importUserData = async () => {
+      importAttempts += 1;
+      if (importAttempts === 1) {
+        throw new MigrationError('IMPORT_CONFLICT', 'conflict');
+      }
+    };
+
+    const first = await migrateLegacyData(
+      {
+        username: 'alice',
+        confirmOwnership,
+      },
+      deps
+    );
+
+    expect(first.status).toBe('conflict');
+    expect(state.sentinel).toEqual({
+      claimedUsername: 'alice',
+      status: 'conflict',
+    });
+    expect(confirmOwnership).toHaveBeenCalledTimes(1);
+
+    deps.clearSentinel();
+
+    const second = await migrateLegacyData(
+      {
+        username: 'alice',
+        confirmOwnership,
+      },
+      deps
+    );
+
+    expect(second.status).toBe('imported');
+    expect(confirmOwnership).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('createMigrationBlockedHandlers', () => {
+  it('routes blocked-screen logout through the full device cleanup callback', () => {
+    const setBootState = vi.fn();
+    const queueMigrationRetry = vi.fn();
+    const resetClaim = vi.fn();
+    const performDeviceLogout = vi.fn();
+    const { onLogout } = createMigrationBlockedHandlers({
+      setBootState,
+      queueMigrationRetry,
+      resetClaim,
+      performDeviceLogout,
+    });
+
+    onLogout();
+
+    expect(performDeviceLogout).toHaveBeenCalledTimes(1);
+    expect(resetClaim).not.toHaveBeenCalled();
+    expect(setBootState).not.toHaveBeenCalled();
+    expect(queueMigrationRetry).not.toHaveBeenCalled();
+  });
+
+  it('clears claim and re-enters loading so migration guard runs again', () => {
+    const setBootState = vi.fn();
+    const queueMigrationRetry = vi.fn();
+    const resetClaim = vi.fn();
+    const performDeviceLogout = vi.fn();
+    const { onReset } = createMigrationBlockedHandlers({
+      setBootState,
+      queueMigrationRetry,
+      resetClaim,
+      performDeviceLogout,
+    });
+
+    onReset();
+
+    expect(resetClaim).toHaveBeenCalledTimes(1);
+    expect(setBootState).toHaveBeenCalledWith({
+      status: 'loading',
+      message: MIGRATION_BOOT_MESSAGE,
+    });
+    expect(queueMigrationRetry).toHaveBeenCalledTimes(1);
+    expect(performDeviceLogout).not.toHaveBeenCalled();
   });
 });

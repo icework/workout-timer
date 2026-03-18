@@ -10,7 +10,46 @@ import { Stats } from './pages/Stats';
 import { LoginPage } from './pages/Login';
 import { useAuthStore } from './stores/authStore';
 import { migrateLegacyData, resetMigrationClaim } from './persistence/migration';
+import { performLogout } from './auth/logout';
 import './index.css';
+
+export const MIGRATION_BOOT_MESSAGE = 'Checking for legacy workout data...';
+
+type BootState =
+  | { status: 'ready' }
+  | { status: 'loading'; message: string }
+  | { status: 'blocked'; message: string };
+
+interface MigrationBlockedHandlerDeps {
+  setBootState: (state: BootState) => void;
+  queueMigrationRetry: () => void;
+  resetClaim?: () => void;
+  performDeviceLogout?: () => void;
+}
+
+export function createMigrationBlockedHandlers({
+  setBootState,
+  queueMigrationRetry,
+  resetClaim = resetMigrationClaim,
+  performDeviceLogout = performLogout,
+}: MigrationBlockedHandlerDeps): {
+  onReset: () => void;
+  onLogout: () => void;
+} {
+  return {
+    onReset: () => {
+      resetClaim();
+      setBootState({
+        status: 'loading',
+        message: MIGRATION_BOOT_MESSAGE,
+      });
+      queueMigrationRetry();
+    },
+    onLogout: () => {
+      performDeviceLogout();
+    },
+  };
+}
 
 function BootLoadingScreen({ message }: { message: string }) {
   return (
@@ -62,12 +101,8 @@ function AppContent() {
   const location = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const username = useAuthStore((state) => state.username);
-  const logout = useAuthStore((state) => state.logout);
-  const [bootState, setBootState] = useState<
-    | { status: 'ready' }
-    | { status: 'loading'; message: string }
-    | { status: 'blocked'; message: string }
-  >({ status: 'ready' });
+  const [bootState, setBootState] = useState<BootState>({ status: 'ready' });
+  const [migrationRetryCount, setMigrationRetryCount] = useState(0);
 
   useEffect(() => {
     if (!isAuthenticated || !username) {
@@ -82,7 +117,7 @@ function AppContent() {
     async function bootstrap() {
       setBootState({
         status: 'loading',
-        message: 'Checking for legacy workout data...',
+        message: MIGRATION_BOOT_MESSAGE,
       });
 
       const result = await migrateLegacyData({
@@ -119,7 +154,7 @@ function AppContent() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, username]);
+  }, [isAuthenticated, migrationRetryCount, username]);
 
   if (!isAuthenticated) {
     return <LoginPage />;
@@ -130,14 +165,18 @@ function AppContent() {
   }
 
   if (bootState.status === 'blocked') {
+    const blockedHandlers = createMigrationBlockedHandlers({
+      setBootState,
+      queueMigrationRetry: () => {
+        setMigrationRetryCount((count) => count + 1);
+      },
+    });
+
     return (
       <MigrationBlockedScreen
         message={bootState.message}
-        onReset={() => {
-          resetMigrationClaim();
-          setBootState({ status: 'ready' });
-        }}
-        onLogout={logout}
+        onReset={blockedHandlers.onReset}
+        onLogout={blockedHandlers.onLogout}
       />
     );
   }

@@ -2,6 +2,12 @@ import { createServer } from 'http';
 import { readFile, stat } from 'fs/promises';
 import { join, extname } from 'path';
 import { createJsonStorage, StorageError } from './src/backend/storage.ts';
+import {
+  validateImportPayload,
+  validateLoginPayload,
+  validateSessionPayload,
+  validateWorkoutPayload,
+} from './src/backend/apiValidation.ts';
 import { normalizeUsername } from './src/auth/username.ts';
 
 const PORT = process.env.PORT || 3000;
@@ -41,38 +47,23 @@ async function readJsonBody(req) {
   return JSON.parse(rawBody);
 }
 
-function isRecord(value) {
-  return typeof value === 'object' && value !== null;
-}
-
-function validateWorkoutPayload(value, id) {
-  if (!isRecord(value) || typeof value.id !== 'string' || value.id !== id) {
-    return false;
-  }
-
-  return typeof value.title === 'string' && Array.isArray(value.blocks);
-}
-
-function validateSessionPayload(value, id) {
-  if (!isRecord(value) || typeof value.id !== 'string' || value.id !== id) {
-    return false;
-  }
-
-  return typeof value.workoutId === 'string' && typeof value.status === 'string';
-}
-
-function validateImportPayload(value) {
-  return (
-    isRecord(value) &&
-    Array.isArray(value.workouts) &&
-    Array.isArray(value.sessions)
-  );
-}
-
 async function handleApiRequest(req, res, url) {
   if (req.method === 'POST' && url.pathname === '/api/login') {
     const body = await readJsonBody(req);
-    const username = normalizeUsername(String(body.username ?? ''));
+
+    if (!validateLoginPayload(body)) {
+      sendJson(res, 400, { error: 'Invalid login payload' });
+      return true;
+    }
+
+    let username;
+    try {
+      username = normalizeUsername(body.username);
+    } catch {
+      sendJson(res, 400, { error: 'Invalid login payload' });
+      return true;
+    }
+
     await storage.ensureUser(username);
     sendJson(res, 200, { username });
     return true;

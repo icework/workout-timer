@@ -1,3 +1,4 @@
+export { AccountMenu } from './AccountMenu';
 export { BlockCard } from './BlockCard';
 export { BottomNav } from './BottomNav';
 export { DurationInput } from './DurationInput';
