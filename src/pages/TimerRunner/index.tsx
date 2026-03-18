@@ -301,7 +301,7 @@ export function TimerRunner() {
   const totalRepeats = currentBlock?.repeatCount || 1;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col min-h-screen bg-gray-50" onClickCapture={primeCountdownAudio}>
       {/* Temporary audio debug banner — remove after fixing iOS sound */}
       <div className="bg-black/80 text-green-400 text-[10px] font-mono p-2 leading-tight">
         {getAudioDebugLog().map((line, i) => (
