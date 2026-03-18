@@ -44,10 +44,30 @@ async function getCountdownAudioContext(): Promise<AudioContext | null> {
 }
 
 /**
+ * Play a 1-sample silent buffer through the context.
+ * On iOS, resume() alone transitions the JS state to 'running' but does NOT
+ * activate the underlying AVAudioSession. Actually scheduling audio (even silent)
+ * is what triggers AVAudioSession activation so subsequent oscillators are heard.
+ */
+function playSilentBuffer(context: AudioContext): void {
+  try {
+    const buf = context.createBuffer(1, 1, context.sampleRate);
+    const src = context.createBufferSource();
+    src.buffer = buf;
+    src.connect(context.destination);
+    src.start(0);
+  } catch {
+    // Non-fatal — context may still work without the silent buffer.
+  }
+}
+
+/**
  * Synchronous unlock — must be called directly from a user gesture handler.
+ *
  * On iOS Chrome (WKWebView), WebKit's user-gesture indicator does not propagate
- * through async wrappers, so `resume()` must be initiated in the synchronous
- * call stack of a touch/click event to be honoured.
+ * through async wrappers, so resume() must be initiated in the synchronous call
+ * stack of a touch/click event. Additionally, iOS requires actual audio playback
+ * (even a silent buffer) to activate AVAudioSession; resume() alone is not enough.
  */
 export function primeCountdownAudio(): void {
   if (typeof window === 'undefined') {
@@ -65,9 +85,19 @@ export function primeCountdownAudio(): void {
     sharedAudioContext = new AudioContextCtor();
   }
 
-  if (sharedAudioContext.state !== 'running') {
-    void sharedAudioContext.resume();
+  const context = sharedAudioContext;
+
+  if (context.state === 'running') {
+    return;
   }
+
+  // resume() is called synchronously here (within the user gesture call stack).
+  // Once it resolves, play a silent buffer to activate iOS AVAudioSession.
+  void context.resume().then(() => {
+    if (context.state === 'running') {
+      playSilentBuffer(context);
+    }
+  });
 }
 
 export async function unlockCountdownAudio(): Promise<boolean> {

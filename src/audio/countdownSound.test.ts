@@ -19,15 +19,23 @@ class MockGain {
   connect = vi.fn();
 }
 
+class MockBufferSource {
+  buffer: AudioBuffer | null = null;
+  connect = vi.fn();
+  start = vi.fn();
+}
+
 class MockAudioContext {
   static allowResume = false;
   static instances: MockAudioContext[] = [];
 
   state: AudioContextState = 'suspended';
   currentTime = 12;
+  sampleRate = 44100;
   destination = {} as AudioDestinationNode;
   oscillator = new MockOscillator();
   gain = new MockGain();
+  bufferSource = new MockBufferSource();
 
   constructor() {
     MockAudioContext.instances.push(this);
@@ -47,6 +55,8 @@ class MockAudioContext {
 
   createOscillator = vi.fn(() => this.oscillator as unknown as OscillatorNode);
   createGain = vi.fn(() => this.gain as unknown as GainNode);
+  createBuffer = vi.fn(() => ({}) as AudioBuffer);
+  createBufferSource = vi.fn(() => this.bufferSource as unknown as AudioBufferSourceNode);
 
   static reset() {
     MockAudioContext.allowResume = false;
@@ -88,7 +98,8 @@ describe('countdown sound player', () => {
     MockAudioContext.allowResume = true;
     primeCountdownAudio(); // synchronous call — no await
 
-    // Flush the microtask queue so the mock's async resume() can settle
+    // Flush microtask queue so the mock's async resume() and the .then() can settle
+    await Promise.resolve();
     await Promise.resolve();
 
     MockAudioContext.allowResume = false;
@@ -97,6 +108,9 @@ describe('countdown sound player', () => {
 
     expect(MockAudioContext.instances).toHaveLength(1);
     expect(MockAudioContext.instances[0].resume).toHaveBeenCalledTimes(1);
+    // Silent buffer should have been played to activate iOS AVAudioSession
+    expect(MockAudioContext.instances[0].createBufferSource).toHaveBeenCalledTimes(1);
+    expect(MockAudioContext.instances[0].bufferSource.start).toHaveBeenCalledTimes(1);
     expect(MockAudioContext.instances[0].createOscillator).toHaveBeenCalledTimes(1);
   });
 });
