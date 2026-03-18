@@ -15,7 +15,7 @@ interface NavigatorWithAudioSession extends Navigator {
 const BEEP_DURATION_SEC = 0.12;
 const BEEP_GAP_SEC = 0.16;
 const BEEP_FREQUENCY_HZ = 880;
-const MAX_GAIN = 0.05;
+const MAX_GAIN = 0.35;
 
 let sharedAudioContext: AudioContext | null = null;
 
