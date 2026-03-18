@@ -38,3 +38,11 @@ class WorkoutTimerDB extends Dexie {
 }
 
 export const db = new WorkoutTimerDB();
+
+export async function clearLegacyData(): Promise<void> {
+  await db.transaction('rw', [db.workouts, db.blocks, db.sessions], async () => {
+    await db.blocks.clear();
+    await db.workouts.clear();
+    await db.sessions.clear();
+  });
+}

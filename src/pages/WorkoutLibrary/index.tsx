@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AccountMenu } from '../../components';
+import { performLogout } from '../../auth/logout';
+import { useAuthStore } from '../../stores/authStore';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { formatDuration, formatLastUsed } from '../../utils/format';
 import type { Workout } from '../../domain/workout';
@@ -186,6 +189,7 @@ function LoadingState() {
  */
 export function WorkoutLibrary() {
   const navigate = useNavigate();
+  const username = useAuthStore((state) => state.username);
 
   // Use selectors for data that changes frequently to prevent unnecessary re-renders
   const workouts = useWorkoutStore((state) => state.workouts);
@@ -246,23 +250,26 @@ export function WorkoutLibrary() {
       <header className="bg-white border-b border-gray-200 px-4 py-4 sticky top-0 z-10">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-900">Workouts</h1>
-          {workouts.length > 0 && (
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 active:bg-blue-800"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-                />
-              </svg>
-              New
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {username && <AccountMenu username={username} onLogout={performLogout} />}
+            {workouts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 active:bg-blue-800"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+                  />
+                </svg>
+                New
+              </button>
+            )}
+          </div>
         </div>
       </header>
 

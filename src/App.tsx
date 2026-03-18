@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { BottomNav, ErrorBoundary } from './components';
 import { WorkoutLibrary } from './pages/WorkoutLibrary';
@@ -6,10 +7,179 @@ import { WorkoutDetail } from './pages/WorkoutDetail';
 import { TimerRunner } from './pages/TimerRunner';
 import { CompletionSummary } from './pages/CompletionSummary';
 import { Stats } from './pages/Stats';
+import { LoginPage } from './pages/Login';
+import { useAuthStore } from './stores/authStore';
+import { migrateLegacyData, resetMigrationClaim } from './persistence/migration';
+import { performLogout } from './auth/logout';
 import './index.css';
+
+export const MIGRATION_BOOT_MESSAGE = 'Checking for legacy workout data...';
+
+type BootState =
+  | { status: 'ready' }
+  | { status: 'loading'; message: string }
+  | { status: 'blocked'; message: string };
+
+interface MigrationBlockedHandlerDeps {
+  setBootState: (state: BootState) => void;
+  queueMigrationRetry: () => void;
+  resetClaim?: () => void;
+  performDeviceLogout?: () => void;
+}
+
+export function createMigrationBlockedHandlers({
+  setBootState,
+  queueMigrationRetry,
+  resetClaim = resetMigrationClaim,
+  performDeviceLogout = performLogout,
+}: MigrationBlockedHandlerDeps): {
+  onReset: () => void;
+  onLogout: () => void;
+} {
+  return {
+    onReset: () => {
+      resetClaim();
+      setBootState({
+        status: 'loading',
+        message: MIGRATION_BOOT_MESSAGE,
+      });
+      queueMigrationRetry();
+    },
+    onLogout: () => {
+      performDeviceLogout();
+    },
+  };
+}
+
+function BootLoadingScreen({ message }: { message: string }) {
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
+        <div className="mx-auto h-8 w-8 rounded-full border-4 border-blue-600 border-t-transparent animate-spin" />
+        <p className="mt-4 text-sm text-gray-600">{message}</p>
+      </div>
+    </main>
+  );
+}
+
+function MigrationBlockedScreen({
+  message,
+  onReset,
+  onLogout,
+}: {
+  message: string;
+  onReset: () => void;
+  onLogout: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-bold text-gray-900">Migration needs attention</h1>
+        <p className="mt-3 text-sm text-gray-600">{message}</p>
+        <div className="mt-6 flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={onReset}
+            className="h-11 rounded-xl bg-blue-600 text-white font-medium hover:bg-blue-700"
+          >
+            Clear Migration Claim
+          </button>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="h-11 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+          >
+            Log Out
+          </button>
+        </div>
+      </div>
+    </main>
+  );
+}
 
 function AppContent() {
   const location = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const username = useAuthStore((state) => state.username);
+  const [bootState, setBootState] = useState<BootState>({ status: 'ready' });
+  const [migrationRetryCount, setMigrationRetryCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthenticated || !username) {
+      setBootState({ status: 'ready' });
+      return;
+    }
+
+    const activeUsername = username;
+
+    let cancelled = false;
+
+    async function bootstrap() {
+      setBootState({
+        status: 'loading',
+        message: MIGRATION_BOOT_MESSAGE,
+      });
+
+      const result = await migrateLegacyData({
+        username: activeUsername,
+        confirmOwnership: async (claimedUsername) =>
+          window.confirm(
+            `Import old local workouts into "${claimedUsername}" and then clear local data from this browser?`
+          ),
+      });
+
+      if (cancelled) {
+        return;
+      }
+
+      if (result.status === 'conflict' || result.status === 'blocked' || result.status === 'failed') {
+        setBootState({ status: 'blocked', message: result.message });
+        return;
+      }
+
+      setBootState({ status: 'ready' });
+    }
+
+    bootstrap().catch((error) => {
+      if (cancelled) {
+        return;
+      }
+
+      setBootState({
+        status: 'blocked',
+        message: error instanceof Error ? error.message : 'Failed to start the app',
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, migrationRetryCount, username]);
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  if (bootState.status === 'loading') {
+    return <BootLoadingScreen message={bootState.message} />;
+  }
+
+  if (bootState.status === 'blocked') {
+    const blockedHandlers = createMigrationBlockedHandlers({
+      setBootState,
+      queueMigrationRetry: () => {
+        setMigrationRetryCount((count) => count + 1);
+      },
+    });
+
+    return (
+      <MigrationBlockedScreen
+        message={bootState.message}
+        onReset={blockedHandlers.onReset}
+        onLogout={blockedHandlers.onLogout}
+      />
+    );
+  }
 
   // Hide bottom nav during workout run and completion screens
   const hideBottomNav =
