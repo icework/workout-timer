@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { BlockCard } from '../../components';
 import { formatDuration } from '../../utils/format';
-import { primeCountdownAudio } from '../../audio/countdownSound';
+import { ensureCountdownAudioContext, primeCountdownAudio } from '../../audio/countdownSound';
 
 /**
  * Workout detail page showing a read-only view of a workout before starting.
@@ -23,6 +23,12 @@ export function WorkoutDetail() {
       loadWorkouts();
     }
   }, [workouts.length, loadWorkouts]);
+
+  // Pre-create the AudioContext on mount so iOS has time to initialise the
+  // audio route before the user taps Start Workout.
+  useEffect(() => {
+    ensureCountdownAudioContext();
+  }, []);
 
   const workout = workouts.find((w) => w.id === id);
   const handleStartWorkout = useCallback(() => {

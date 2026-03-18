@@ -19,6 +19,35 @@ const MAX_GAIN = 0.05;
 
 let sharedAudioContext: AudioContext | null = null;
 
+/**
+ * Pre-create the AudioContext without resuming it. Call this on page mount so
+ * iOS has time to initialise the internal audio route before resume() is called
+ * from a user gesture. Creating and resuming in the same event handler fails on
+ * iOS because the audio route hasn't been set up yet.
+ */
+export function ensureCountdownAudioContext(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const audioWindow = window as AudioWindow;
+  const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+
+  if (!AudioContextCtor) {
+    return;
+  }
+
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioContextCtor();
+  }
+
+  // Set audio session early so iOS routes through the media channel.
+  const nav = navigator as NavigatorWithAudioSession;
+  if (nav.audioSession) {
+    nav.audioSession.type = 'playback';
+  }
+}
+
 async function getCountdownAudioContext(): Promise<AudioContext | null> {
   if (typeof window === 'undefined') {
     return null;
@@ -67,44 +96,25 @@ function playSilentBuffer(context: AudioContext): void {
 }
 
 /**
- * Synchronous unlock — must be called directly from a user gesture handler.
+ * Resume the AudioContext — must be called from a user gesture handler.
  *
- * On iOS Chrome (WKWebView), both the silent-buffer playback and resume() must
- * happen in the synchronous call stack of the click/touch event. Using .then()
- * defers work to a microtask that is outside the gesture window on older iOS.
- *
- * Correct order (matches Howler.js / Tone.js):
- *   1. playSilentBuffer() — schedules audio, signals "audio intent" to iOS
- *   2. resume()           — transitions the context from suspended → running
+ * The context should already exist from an earlier ensureCountdownAudioContext()
+ * call. On iOS, creating and resuming in the same gesture fails because the audio
+ * route hasn't been initialised yet. Splitting creation (mount) from resumption
+ * (click) gives iOS the time it needs.
  */
 export function primeCountdownAudio(): void {
   if (typeof window === 'undefined') {
     return;
   }
 
-  const audioWindow = window as AudioWindow;
-  const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
-
-  if (!AudioContextCtor) {
-    return;
-  }
-
-  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
-    sharedAudioContext = new AudioContextCtor();
-  }
+  // Ensure context exists (fallback if ensureCountdownAudioContext wasn't called).
+  ensureCountdownAudioContext();
 
   const context = sharedAudioContext;
 
-  if (context.state === 'running') {
+  if (!context || context.state === 'running') {
     return;
-  }
-
-  // iOS routes Web Audio through the "ambient" channel by default, which can
-  // be silenced by the OS. Setting type = "playback" switches to the media
-  // channel. Requires iOS 17+ / Safari 17+; ignored elsewhere.
-  const nav = navigator as NavigatorWithAudioSession;
-  if (nav.audioSession) {
-    nav.audioSession.type = 'playback';
   }
 
   playSilentBuffer(context);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createCountdownSoundPlayer, primeCountdownAudio, unlockCountdownAudio } from './countdownSound';
+import { createCountdownSoundPlayer, ensureCountdownAudioContext, primeCountdownAudio, unlockCountdownAudio } from './countdownSound';
 
 class MockOscillator {
   type = 'sine';
@@ -112,5 +112,29 @@ describe('countdown sound player', () => {
     await player.playBeeps([3]);
 
     expect(MockAudioContext.instances[0].createOscillator).toHaveBeenCalledTimes(1);
+  });
+
+  it('ensureCountdownAudioContext creates context without resuming it', () => {
+    vi.stubGlobal('window', {
+      AudioContext: MockAudioContext,
+    });
+
+    ensureCountdownAudioContext();
+
+    expect(MockAudioContext.instances).toHaveLength(1);
+    // Context should be created but NOT resumed — iOS needs the gap
+    expect(MockAudioContext.instances[0].resume).not.toHaveBeenCalled();
+    expect(MockAudioContext.instances[0].state).toBe('suspended');
+  });
+
+  it('ensureCountdownAudioContext reuses existing context', () => {
+    vi.stubGlobal('window', {
+      AudioContext: MockAudioContext,
+    });
+
+    ensureCountdownAudioContext();
+    ensureCountdownAudioContext();
+
+    expect(MockAudioContext.instances).toHaveLength(1);
   });
 });

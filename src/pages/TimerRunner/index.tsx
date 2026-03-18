@@ -6,7 +6,7 @@ import { TimerDisplay } from '../../components/TimerDisplay';
 import { TimerControls } from '../../components/TimerControls';
 import { getProgress, getCurrentPhase } from '../../domain/timer';
 import { getCountdownSeconds } from '../../audio/countdown';
-import { createCountdownSoundPlayer, primeCountdownAudio } from '../../audio/countdownSound';
+import { createCountdownSoundPlayer, ensureCountdownAudioContext, primeCountdownAudio } from '../../audio/countdownSound';
 import { profileRepo } from '../../persistence/profileRepo';
 
 const TICK_INTERVAL_MS = 100;
@@ -54,6 +54,12 @@ export function TimerRunner() {
 
   // Find workout by ID
   const workout = workouts.find((w) => w.id === id) || timerWorkout;
+
+  // Pre-create AudioContext on mount so iOS has time to initialise the audio
+  // route before the first beep is scheduled (same pattern as WorkoutDetail).
+  useEffect(() => {
+    ensureCountdownAudioContext();
+  }, []);
 
   // Initialize workout on mount
   useEffect(() => {
