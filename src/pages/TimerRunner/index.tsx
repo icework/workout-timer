@@ -1,10 +1,13 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTimerStore } from '../../stores/timerStore';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { TimerDisplay } from '../../components/TimerDisplay';
 import { TimerControls } from '../../components/TimerControls';
 import { getProgress, getCurrentPhase } from '../../domain/timer';
+import { getCountdownSeconds } from '../../audio/countdown';
+import { createCountdownSoundPlayer } from '../../audio/countdownSound';
+import { profileRepo } from '../../persistence/profileRepo';
 
 const TICK_INTERVAL_MS = 100;
 
@@ -43,6 +46,11 @@ export function TimerRunner() {
   const intervalRef = useRef<number | null>(null);
   const lastTickTimeRef = useRef<number>(0);
   const isInitializedRef = useRef(false);
+  const countdownPhaseIndexRef = useRef<number | null>(null);
+  const countdownRemainingRef = useRef<number | null>(null);
+  const playedCountdownSecondsRef = useRef<number[]>([]);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [countdownSoundPlayer] = useState(() => createCountdownSoundPlayer());
 
   // Find workout by ID
   const workout = workouts.find((w) => w.id === id) || timerWorkout;
@@ -60,6 +68,27 @@ export function TimerRunner() {
     }
     init();
   }, [workouts.length, loadWorkouts]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadPreferences() {
+      try {
+        const preferences = await profileRepo.getPreferences();
+        if (isMounted) {
+          setSoundEnabled(preferences.soundEnabled);
+        }
+      } catch (error) {
+        console.error('Failed to load preferences:', error);
+      }
+    }
+
+    loadPreferences();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Start workout when we have the workout data and no timer is running
   useEffect(() => {
@@ -159,8 +188,46 @@ export function TimerRunner() {
       if (intervalRef.current !== null) {
         clearInterval(intervalRef.current);
       }
+      void countdownSoundPlayer.cleanup();
     };
-  }, []);
+  }, [countdownSoundPlayer]);
+
+  useEffect(() => {
+    if (!timerState || timerState.phase === 'finished') {
+      countdownPhaseIndexRef.current = null;
+      countdownRemainingRef.current = null;
+      playedCountdownSecondsRef.current = [];
+      return;
+    }
+
+    const previousPhaseIndex = countdownPhaseIndexRef.current;
+    const previousRemainingSec = countdownRemainingRef.current;
+    const isNewPhase = previousPhaseIndex !== timerState.currentPhaseIndex;
+    const isPhaseRestart =
+      previousRemainingSec !== null && timerState.remainingSec > previousRemainingSec;
+
+    if (isNewPhase || isPhaseRestart) {
+      playedCountdownSecondsRef.current = [];
+    }
+
+    const countdownSeconds = getCountdownSeconds({
+      previousRemainingSec: isNewPhase || isPhaseRestart ? undefined : previousRemainingSec ?? undefined,
+      currentRemainingSec: timerState.remainingSec,
+      alreadyPlayed: playedCountdownSecondsRef.current,
+      soundEnabled,
+    });
+
+    if (countdownSeconds.length > 0) {
+      playedCountdownSecondsRef.current = [
+        ...playedCountdownSecondsRef.current,
+        ...countdownSeconds,
+      ];
+      void countdownSoundPlayer.playBeeps(countdownSeconds);
+    }
+
+    countdownPhaseIndexRef.current = timerState.currentPhaseIndex;
+    countdownRemainingRef.current = timerState.remainingSec;
+  }, [countdownSoundPlayer, soundEnabled, timerState]);
 
   // Handle end early
   const handleEndEarly = useCallback(async () => {
