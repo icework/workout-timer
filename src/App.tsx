@@ -6,10 +6,17 @@ import { WorkoutDetail } from './pages/WorkoutDetail';
 import { TimerRunner } from './pages/TimerRunner';
 import { CompletionSummary } from './pages/CompletionSummary';
 import { Stats } from './pages/Stats';
+import { LoginPage } from './pages/Login';
+import { useAuthStore } from './stores/authStore';
 import './index.css';
 
 function AppContent() {
   const location = useLocation();
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   // Hide bottom nav during workout run and completion screens
   const hideBottomNav =
