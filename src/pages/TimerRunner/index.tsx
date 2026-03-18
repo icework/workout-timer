@@ -6,7 +6,7 @@ import { TimerDisplay } from '../../components/TimerDisplay';
 import { TimerControls } from '../../components/TimerControls';
 import { getProgress, getCurrentPhase } from '../../domain/timer';
 import { getCountdownSeconds } from '../../audio/countdown';
-import { createCountdownSoundPlayer } from '../../audio/countdownSound';
+import { createCountdownSoundPlayer, unlockCountdownAudio } from '../../audio/countdownSound';
 import { profileRepo } from '../../persistence/profileRepo';
 
 const TICK_INTERVAL_MS = 100;
@@ -241,6 +241,11 @@ export function TimerRunner() {
     }
   }, [endEarly, id, navigate]);
 
+  const handleResume = useCallback(() => {
+    void unlockCountdownAudio();
+    resume();
+  }, [resume]);
+
   // Handle back navigation (abandon workout)
   const handleBackToWorkout = useCallback(async () => {
     if (intervalRef.current !== null) {
@@ -355,7 +360,7 @@ export function TimerRunner() {
           <TimerControls
             isPaused={timerState.isPaused}
             onPause={pause}
-            onResume={resume}
+            onResume={handleResume}
             onSkip={skip}
             onBack={goBack}
             onEndEarly={handleEndEarly}

@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { BlockCard } from '../../components';
 import { formatDuration } from '../../utils/format';
+import { unlockCountdownAudio } from '../../audio/countdownSound';
 
 /**
  * Workout detail page showing a read-only view of a workout before starting.
@@ -24,6 +25,10 @@ export function WorkoutDetail() {
   }, [workouts.length, loadWorkouts]);
 
   const workout = workouts.find((w) => w.id === id);
+  const handleStartWorkout = useCallback(() => {
+    void unlockCountdownAudio();
+    navigate(`/workout/${id}/run`);
+  }, [id, navigate]);
 
   if (isLoading) {
     return (
@@ -145,7 +150,7 @@ export function WorkoutDetail() {
         <div className="fixed bottom-20 left-0 right-0 px-4 pb-4 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-8">
           <button
             type="button"
-            onClick={() => navigate(`/workout/${id}/run`)}
+            onClick={handleStartWorkout}
             className="w-full py-4 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white font-semibold rounded-xl shadow-lg transition-colors"
           >
             Start Workout

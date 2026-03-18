@@ -12,52 +12,53 @@ const BEEP_GAP_SEC = 0.16;
 const BEEP_FREQUENCY_HZ = 880;
 const MAX_GAIN = 0.05;
 
+let sharedAudioContext: AudioContext | null = null;
+
+async function getCountdownAudioContext(): Promise<AudioContext | null> {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const audioWindow = window as AudioWindow;
+  const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+
+  if (!AudioContextCtor) {
+    return null;
+  }
+
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioContextCtor();
+  }
+
+  const context = sharedAudioContext;
+
+  if (context.state === 'suspended') {
+    try {
+      await context.resume();
+    } catch {
+      return null;
+    }
+  }
+
+  return context.state === 'running' ? context : null;
+}
+
+export async function unlockCountdownAudio(): Promise<boolean> {
+  const context = await getCountdownAudioContext();
+  return context !== null;
+}
+
 /**
  * Lightweight Web Audio countdown beeps. Playback failures are swallowed so the timer never breaks.
  */
 export function createCountdownSoundPlayer() {
-  let audioContext: AudioContext | null = null;
-
-  const getAudioContext = async (): Promise<AudioContext | null> => {
-    if (typeof window === 'undefined') {
-      return null;
-    }
-
-    const audioWindow = window as AudioWindow;
-    const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
-
-    if (!AudioContextCtor) {
-      return null;
-    }
-
-    if (!audioContext) {
-      audioContext = new AudioContextCtor();
-    }
-
-    const context = audioContext;
-
-    if (!context) {
-      return null;
-    }
-
-    if (context.state === 'suspended') {
-      try {
-        await context.resume();
-      } catch {
-        return null;
-      }
-    }
-
-    return context.state === 'running' ? context : null;
-  };
-
   return {
     async playBeeps(seconds: number[]): Promise<void> {
       if (seconds.length === 0) {
         return;
       }
 
-      const context = await getAudioContext();
+      const context = await getCountdownAudioContext();
 
       if (!context) {
         return;
@@ -87,12 +88,12 @@ export function createCountdownSoundPlayer() {
     },
 
     async cleanup(): Promise<void> {
-      if (!audioContext) {
+      if (!sharedAudioContext) {
         return;
       }
 
-      const contextToClose = audioContext;
-      audioContext = null;
+      const contextToClose = sharedAudioContext;
+      sharedAudioContext = null;
 
       try {
         await contextToClose.close();
