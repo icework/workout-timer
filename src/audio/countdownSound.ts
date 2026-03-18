@@ -18,6 +18,21 @@ const BEEP_FREQUENCY_HZ = 880;
 const MAX_GAIN = 0.05;
 
 let sharedAudioContext: AudioContext | null = null;
+let debugLog: string[] = [];
+
+function addDebug(msg: string): void {
+  debugLog.push(`${new Date().toISOString().slice(11, 19)} ${msg}`);
+  if (debugLog.length > 20) debugLog.shift();
+}
+
+/** Temporary: returns recent audio debug messages for on-screen display. */
+export function getAudioDebugLog(): string[] {
+  return [
+    `ctx=${sharedAudioContext?.state ?? 'null'}`,
+    `audioSession=${(navigator as NavigatorWithAudioSession).audioSession?.type ?? 'N/A'}`,
+    ...debugLog.slice(-6),
+  ];
+}
 
 async function getCountdownAudioContext(): Promise<AudioContext | null> {
   if (typeof window === 'undefined') {
@@ -86,31 +101,36 @@ export function primeCountdownAudio(): void {
   const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
 
   if (!AudioContextCtor) {
+    addDebug('prime: no AudioContext constructor');
     return;
   }
 
   if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
     sharedAudioContext = new AudioContextCtor();
+    addDebug(`prime: created ctx, state=${sharedAudioContext.state}`);
   }
 
   const context = sharedAudioContext;
 
   if (context.state === 'running') {
+    addDebug('prime: already running');
     return;
   }
 
-  // iOS routes Web Audio through the "ambient" channel by default, which is
-  // silenced by the ringer switch and can be muted by the OS even when the
-  // switch is off. Setting type = "playback" switches to the media channel
-  // (same as <audio>/<video>), which is always audible when the device is
-  // not in silent mode. Requires iOS 17+ / Safari 17+; ignored elsewhere.
   const nav = navigator as NavigatorWithAudioSession;
   if (nav.audioSession) {
     nav.audioSession.type = 'playback';
+    addDebug('prime: audioSession.type=playback');
+  } else {
+    addDebug('prime: no audioSession API');
   }
 
   playSilentBuffer(context);
-  void context.resume();
+  addDebug(`prime: silentBuf played, state=${context.state}`);
+  void context.resume().then(
+    () => addDebug(`prime: resume ok, state=${context.state}`),
+    (err: unknown) => addDebug(`prime: resume FAIL ${err}`),
+  );
 }
 
 export async function unlockCountdownAudio(): Promise<boolean> {
@@ -128,11 +148,15 @@ export function createCountdownSoundPlayer() {
         return;
       }
 
+      addDebug(`playBeeps: secs=[${seconds}] ctxState=${sharedAudioContext?.state ?? 'null'}`);
       const context = await getCountdownAudioContext();
 
       if (!context) {
+        addDebug('playBeeps: context is null, skipping');
         return;
       }
+
+      addDebug(`playBeeps: scheduling ${seconds.length} osc, state=${context.state}`);
 
       const baseTime = context.currentTime;
 

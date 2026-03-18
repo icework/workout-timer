@@ -6,7 +6,7 @@ import { TimerDisplay } from '../../components/TimerDisplay';
 import { TimerControls } from '../../components/TimerControls';
 import { getProgress, getCurrentPhase } from '../../domain/timer';
 import { getCountdownSeconds } from '../../audio/countdown';
-import { createCountdownSoundPlayer, primeCountdownAudio } from '../../audio/countdownSound';
+import { createCountdownSoundPlayer, primeCountdownAudio, getAudioDebugLog } from '../../audio/countdownSound';
 import { profileRepo } from '../../persistence/profileRepo';
 
 const TICK_INTERVAL_MS = 100;
@@ -302,6 +302,13 @@ export function TimerRunner() {
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-50">
+      {/* Temporary audio debug banner — remove after fixing iOS sound */}
+      <div className="bg-black/80 text-green-400 text-[10px] font-mono p-2 leading-tight">
+        {getAudioDebugLog().map((line, i) => (
+          <div key={i}>{line}</div>
+        ))}
+      </div>
+
       {/* Header with back button */}
       <header className="flex items-center p-4 bg-white border-b border-gray-200">
         <button
