@@ -6,7 +6,7 @@ import { TimerDisplay } from '../../components/TimerDisplay';
 import { TimerControls } from '../../components/TimerControls';
 import { getProgress, getCurrentPhase } from '../../domain/timer';
 import { getCountdownSeconds } from '../../audio/countdown';
-import { createCountdownSoundPlayer, unlockCountdownAudio } from '../../audio/countdownSound';
+import { createCountdownSoundPlayer, primeCountdownAudio } from '../../audio/countdownSound';
 import { profileRepo } from '../../persistence/profileRepo';
 
 const TICK_INTERVAL_MS = 100;
@@ -242,7 +242,7 @@ export function TimerRunner() {
   }, [endEarly, id, navigate]);
 
   const handleResume = useCallback(() => {
-    void unlockCountdownAudio();
+    primeCountdownAudio();
     resume();
   }, [resume]);
 

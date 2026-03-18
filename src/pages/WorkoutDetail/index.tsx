@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { BlockCard } from '../../components';
 import { formatDuration } from '../../utils/format';
-import { unlockCountdownAudio } from '../../audio/countdownSound';
+import { primeCountdownAudio } from '../../audio/countdownSound';
 
 /**
  * Workout detail page showing a read-only view of a workout before starting.
@@ -26,7 +26,7 @@ export function WorkoutDetail() {
 
   const workout = workouts.find((w) => w.id === id);
   const handleStartWorkout = useCallback(() => {
-    void unlockCountdownAudio();
+    primeCountdownAudio();
     navigate(`/workout/${id}/run`);
   }, [id, navigate]);
 

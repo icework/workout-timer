@@ -43,6 +43,33 @@ async function getCountdownAudioContext(): Promise<AudioContext | null> {
   return context.state === 'running' ? context : null;
 }
 
+/**
+ * Synchronous unlock — must be called directly from a user gesture handler.
+ * On iOS Chrome (WKWebView), WebKit's user-gesture indicator does not propagate
+ * through async wrappers, so `resume()` must be initiated in the synchronous
+ * call stack of a touch/click event to be honoured.
+ */
+export function primeCountdownAudio(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const audioWindow = window as AudioWindow;
+  const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext;
+
+  if (!AudioContextCtor) {
+    return;
+  }
+
+  if (!sharedAudioContext || sharedAudioContext.state === 'closed') {
+    sharedAudioContext = new AudioContextCtor();
+  }
+
+  if (sharedAudioContext.state !== 'running') {
+    void sharedAudioContext.resume();
+  }
+}
+
 export async function unlockCountdownAudio(): Promise<boolean> {
   const context = await getCountdownAudioContext();
   return context !== null;

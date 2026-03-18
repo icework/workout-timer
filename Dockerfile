@@ -25,6 +25,12 @@ COPY server.js ./
 COPY src/ ./src/
 COPY --from=builder /app/dist ./dist/
 
+# Declare the data directory as a volume so orchestration platforms can mount
+# persistent storage here. Without a mounted volume every new container starts
+# with an empty /app/data directory and all user data is lost on redeployment.
+# Set the STORAGE_PATH env var to override the path (e.g. a mounted NFS share).
+VOLUME ["/app/data"]
+
 EXPOSE 3000
 
 CMD ["node", "server.js"]

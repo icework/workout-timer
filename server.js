@@ -12,7 +12,7 @@ import { normalizeUsername } from './src/auth/username.ts';
 
 const PORT = process.env.PORT || 3000;
 const DIST_DIR = join(process.cwd(), 'dist');
-const STORAGE_PATH = join(process.cwd(), 'data', 'storage.json');
+const STORAGE_PATH = process.env.STORAGE_PATH || join(process.cwd(), 'data', 'storage.json');
 const storage = createJsonStorage(STORAGE_PATH);
 
 const MIME_TYPES = {
