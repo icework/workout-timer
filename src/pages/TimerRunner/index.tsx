@@ -8,6 +8,7 @@ import { getProgress, getCurrentPhase } from '../../domain/timer';
 import { getCountdownSeconds } from '../../audio/countdown';
 import { createCountdownSoundPlayer, ensureCountdownAudioContext, primeCountdownAudio } from '../../audio/countdownSound';
 import { profileRepo } from '../../persistence/profileRepo';
+import { requestWakeLock, releaseWakeLock, reacquireWakeLock } from '../../utils/screenWakeLock';
 
 const TICK_INTERVAL_MS = 100;
 
@@ -158,6 +159,7 @@ export function TimerRunner() {
   }, [timerState?.isPaused, timerState?.phase, timerState, performTick]);
 
   // Handle browser backgrounding with visibilitychange
+  // Also handles screen wake lock re-acquisition (wake lock auto-releases on background)
   useEffect(() => {
     function handleVisibilityChange() {
       if (document.hidden) {
@@ -166,6 +168,8 @@ export function TimerRunner() {
           clearInterval(intervalRef.current);
           intervalRef.current = null;
         }
+        // Wake lock is automatically released by the browser when hidden
+        // No explicit release needed here
       } else {
         // Tab is visible again - calculate elapsed time and catch up
         if (timerState && !timerState.isPaused && timerState.phase !== 'finished') {
@@ -179,6 +183,8 @@ export function TimerRunner() {
           // Restart the interval
           intervalRef.current = window.setInterval(performTick, TICK_INTERVAL_MS);
         }
+        // Re-acquire wake lock when tab becomes visible again
+        void reacquireWakeLock();
       }
     }
 
@@ -188,6 +194,19 @@ export function TimerRunner() {
     };
   }, [timerState, tick, performTick]);
 
+  // Acquire/release screen wake lock based on workout state
+  useEffect(() => {
+    if (!timerState) return;
+
+    if (!timerState.isPaused && timerState.phase !== 'finished') {
+      // Workout is actively running — acquire wake lock
+      void requestWakeLock();
+    } else {
+      // Workout is paused or finished — release wake lock
+      void releaseWakeLock();
+    }
+  }, [timerState?.isPaused, timerState?.phase, timerState]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -195,6 +214,7 @@ export function TimerRunner() {
         clearInterval(intervalRef.current);
       }
       void countdownSoundPlayer.cleanup();
+      void releaseWakeLock();
     };
   }, [countdownSoundPlayer]);
 
