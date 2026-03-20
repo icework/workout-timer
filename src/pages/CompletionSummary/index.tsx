@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { navigateToWorkoutRun } from '../../audio/countdownNavigation';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { formatTime } from '../../utils/format';
@@ -78,7 +79,9 @@ export function CompletionSummary() {
   // Handle "Start Again" button - restart the workout
   const handleStartAgain = () => {
     resetTimer();
-    navigate(`/workout/${id}/run`);
+    if (id) {
+      navigateToWorkoutRun(navigate, id);
+    }
   };
 
   // Loading state

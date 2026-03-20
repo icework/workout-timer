@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountMenu } from '../../components';
 import { performLogout } from '../../auth/logout';
+import { navigateToWorkoutRun } from '../../audio/countdownNavigation';
 import { useAuthStore } from '../../stores/authStore';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { formatDuration, formatLastUsed } from '../../utils/format';
@@ -207,7 +208,7 @@ export function WorkoutLibrary() {
   };
 
   const handleStart = (workoutId: string) => {
-    navigate(`/workout/${workoutId}/run`);
+    navigateToWorkoutRun(navigate, workoutId);
   };
 
   const handleOpen = (workoutId: string) => {
