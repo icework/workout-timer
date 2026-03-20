@@ -21,6 +21,7 @@ interface WorkoutStore {
   setCurrentWorkout: (workout: Workout | null) => void;
   createWorkout: (title: string) => Promise<Workout>;
   updateWorkout: (id: string, updates: Partial<Workout>) => Promise<void>;
+  markWorkoutUsed: (workout: Workout, usedAt?: Date) => Promise<void>;
   deleteWorkout: (id: string) => Promise<void>; // soft delete
   duplicateWorkout: (id: string) => Promise<Workout>;
   addBlock: (
@@ -89,6 +90,23 @@ export const useWorkoutStore = create<WorkoutStore>((set, get) => ({
     set({
       workouts: workouts.map((w) => (w.id === id ? finalWorkout : w)),
       currentWorkout: currentWorkout?.id === id ? finalWorkout : currentWorkout,
+    });
+  },
+
+  markWorkoutUsed: async (workout, usedAt = new Date()) => {
+    const { workouts, currentWorkout } = get();
+    const existingWorkout = workouts.find((w) => w.id === workout.id);
+
+    const updatedWorkout: Workout = {
+      ...(existingWorkout ?? workout),
+      lastUsedAt: usedAt,
+    };
+
+    await workoutRepo.save(updatedWorkout);
+
+    set({
+      workouts: workouts.map((w) => (w.id === workout.id ? updatedWorkout : w)),
+      currentWorkout: currentWorkout?.id === workout.id ? updatedWorkout : currentWorkout,
     });
   },
 

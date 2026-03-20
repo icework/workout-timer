@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountMenu } from '../../components';
 import { performLogout } from '../../auth/logout';
+import {
+  navigateToWorkoutRun,
+  prepareCountdownAudioForStart,
+} from '../../audio/countdownNavigation';
 import { useAuthStore } from '../../stores/authStore';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { formatDuration, formatLastUsed } from '../../utils/format';
@@ -202,12 +206,16 @@ export function WorkoutLibrary() {
     loadWorkouts();
   }, [loadWorkouts]);
 
+  useEffect(() => {
+    prepareCountdownAudioForStart();
+  }, []);
+
   const handleCreate = () => {
     navigate('/workout/new');
   };
 
   const handleStart = (workoutId: string) => {
-    navigate(`/workout/${workoutId}/run`);
+    navigateToWorkoutRun(navigate, workoutId);
   };
 
   const handleOpen = (workoutId: string) => {
