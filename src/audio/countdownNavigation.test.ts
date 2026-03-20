@@ -2,10 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./countdownSound', () => ({
   primeCountdownAudio: vi.fn(),
+  ensureCountdownAudioContext: vi.fn(),
 }));
 
-import { primeCountdownAudio } from './countdownSound';
-import { navigateToWorkoutRun } from './countdownNavigation';
+import { ensureCountdownAudioContext, primeCountdownAudio } from './countdownSound';
+import { navigateToWorkoutRun, prepareCountdownAudioForStart } from './countdownNavigation';
 
 describe('navigateToWorkoutRun', () => {
   beforeEach(() => {
@@ -32,5 +33,19 @@ describe('navigateToWorkoutRun', () => {
 
     expect(() => navigateToWorkoutRun(navigate, 'workout-1')).not.toThrow();
     expect(navigate).toHaveBeenCalledWith('/workout/workout-1/run');
+  });
+
+  it('pre-creates the audio context for start entry screens', () => {
+    prepareCountdownAudioForStart();
+
+    expect(ensureCountdownAudioContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('swallows errors while pre-creating the audio context', () => {
+    vi.mocked(ensureCountdownAudioContext).mockImplementationOnce(() => {
+      throw new Error('prewarm failed');
+    });
+
+    expect(() => prepareCountdownAudioForStart()).not.toThrow();
   });
 });

@@ -49,15 +49,17 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     const session = createSessionDomain(workout);
     await sessionRepo.save(session);
 
-    try {
-      await useWorkoutStore.getState().markWorkoutUsed(workout, session.startedAt);
-    } catch (error) {
-      console.error('Failed to update workout last used time:', error);
-    }
-
     set((state) => ({
       sessions: [...state.sessions, session],
     }));
+
+    void useWorkoutStore
+      .getState()
+      .markWorkoutUsed(workout, session.startedAt)
+      .catch((error) => {
+        console.error('Failed to update workout last used time:', error);
+      });
+
     return session;
   },
 

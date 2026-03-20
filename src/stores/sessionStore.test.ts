@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Workout } from '../domain/workout';
 
 vi.mock('../persistence/sessionRepo', () => ({
@@ -25,7 +25,7 @@ import { workoutRepo } from '../persistence/workoutRepo';
 import { useSessionStore } from './sessionStore';
 import { useWorkoutStore } from './workoutStore';
 
-const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function createWorkout(): Workout {
   return {
@@ -39,9 +39,18 @@ function createWorkout(): Workout {
   };
 }
 
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>((resolver) => {
+    resolve = resolver;
+  });
+  return { promise, resolve };
+}
+
 describe('useSessionStore', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const workout = createWorkout();
 
@@ -58,10 +67,15 @@ describe('useSessionStore', () => {
     });
   });
 
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
+  });
+
   it('marks the workout as used when a session starts', async () => {
     const workout = useWorkoutStore.getState().workouts[0];
 
     const session = await useSessionStore.getState().createSession(workout);
+    await Promise.resolve();
 
     const updatedWorkout = useWorkoutStore.getState().workouts[0];
     const currentWorkout = useWorkoutStore.getState().currentWorkout;
@@ -88,6 +102,7 @@ describe('useSessionStore', () => {
     vi.mocked(workoutRepo.save).mockRejectedValueOnce(new Error('workout write failed'));
 
     const session = await useSessionStore.getState().createSession(workout);
+    await Promise.resolve();
 
     expect(sessionRepo.save).toHaveBeenCalledWith(session);
     expect(useSessionStore.getState().sessions).toEqual([session]);
@@ -117,5 +132,26 @@ describe('useSessionStore', () => {
       })
     );
     expect(useSessionStore.getState().sessions).toEqual([session]);
+  });
+
+  it('resolves session start before the last-used metadata write finishes', async () => {
+    const workout = useWorkoutStore.getState().workouts[0];
+    const deferred = createDeferred<void>();
+    vi.mocked(workoutRepo.save).mockImplementationOnce(() => deferred.promise);
+
+    const createSessionPromise = useSessionStore.getState().createSession(workout);
+    let resolved = false;
+    void createSessionPromise.then(() => {
+      resolved = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(resolved).toBe(true);
+
+    deferred.resolve(undefined);
+    await createSessionPromise;
   });
 });

@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AccountMenu } from '../../components';
 import { performLogout } from '../../auth/logout';
-import { navigateToWorkoutRun } from '../../audio/countdownNavigation';
+import {
+  navigateToWorkoutRun,
+  prepareCountdownAudioForStart,
+} from '../../audio/countdownNavigation';
 import { useAuthStore } from '../../stores/authStore';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { formatDuration, formatLastUsed } from '../../utils/format';
@@ -202,6 +205,10 @@ export function WorkoutLibrary() {
   useEffect(() => {
     loadWorkouts();
   }, [loadWorkouts]);
+
+  useEffect(() => {
+    prepareCountdownAudioForStart();
+  }, []);
 
   const handleCreate = () => {
     navigate('/workout/new');

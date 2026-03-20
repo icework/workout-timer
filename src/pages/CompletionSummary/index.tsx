@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { navigateToWorkoutRun } from '../../audio/countdownNavigation';
+import {
+  navigateToWorkoutRun,
+  prepareCountdownAudioForStart,
+} from '../../audio/countdownNavigation';
 import { useSessionStore } from '../../stores/sessionStore';
 import { useTimerStore } from '../../stores/timerStore';
 import { formatTime } from '../../utils/format';
@@ -26,6 +29,10 @@ export function CompletionSummary() {
 
   const [session, setSession] = useState<WorkoutSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    prepareCountdownAudioForStart();
+  }, []);
 
   // Load sessions and find the most recent one for this workout
   useEffect(() => {
